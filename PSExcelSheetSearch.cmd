@@ -1,2 +1,2 @@
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0PS_ExcelSheetSearch.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0PSExcelSheetSearch.ps1"
