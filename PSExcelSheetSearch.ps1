@@ -78,8 +78,13 @@ $setImportExcelPathMenuItem.Add_Click({
         [System.Windows.Forms.MessageBox]::Show("設定が保存されました。")
         Import-Module "$importExcelPath\ImportExcel.psd1"
         Add-Type -Path "$importExcelPath\EPPlus.dll"
+        $setImportExcelPathMenuItem.Checked = $true
     }
 })
+if ($importExcelPath -ne ""){
+    # 設定ファイルからパスが読込できている場合、チェックオン
+    $setImportExcelPathMenuItem.Checked = $true
+}
 [void]$optionsMenu.DropDownItems.Add($setImportExcelPathMenuItem)
 
 # ヘルプメニューの作成
