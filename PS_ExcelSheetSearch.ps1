@@ -37,7 +37,7 @@ $exitMenuItem.Add_Click({ $form.Close() })
 
 # オプションメニューの作成
 $optionsMenu = New-Object System.Windows.Forms.ToolStripMenuItem("オプション")
-$useComObjectMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem("Use COM Object")
+$useComObjectMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem("ComObject を使ってExcelに接続する")
 $useComObjectMenuItem.CheckOnClick = $true
 [void]$optionsMenu.DropDownItems.Add($useComObjectMenuItem)
 
