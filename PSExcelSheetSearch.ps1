@@ -5,10 +5,38 @@ $appReleaseDate = "2024-11-25"
 
 # 必要なモジュールをインポート
 Add-Type -AssemblyName System.Windows.Forms
-Import-Module ImportExcel
+#Import-Module ImportExcel
 # インストールせずにローカルフォルダにライブラリをおいて使う場合
 #Import-Module "$PSScriptRoot\ImportExcel-7.8.10\ImportExcel.psd1"
 #Add-Type -Path "$PSScriptRoot\ImportExcel-7.8.10\EPPlus.dll"
+
+# 設定ファイルのパス
+$configFilePath = "$PSScriptRoot\config.json"
+
+# 設定ファイルが存在する場合、設定を読み込む
+if (Test-Path $configFilePath) {
+    $config = Get-Content $configFilePath | ConvertFrom-Json
+    $importExcelPath = $config.ImportExcelPath
+} else {
+    $importExcelPath = ""
+}
+
+# 設定を保存する関数
+function Save-Config {
+    param (
+        [string]$importExcelPath
+    )
+    $config = @{
+        ImportExcelPath = $importExcelPath
+    }
+    $config | ConvertTo-Json | Set-Content -Path $configFilePath
+}
+
+# Import-Module と Add-Type の実行
+if ($importExcelPath) {
+    Import-Module "$importExcelPath\ImportExcel.psd1"
+    Add-Type -Path "$importExcelPath\EPPlus.dll"
+}
 
 # debug message 表示するか
 $debugOut = $false
@@ -40,6 +68,19 @@ $optionsMenu = New-Object System.Windows.Forms.ToolStripMenuItem("オプション")
 $useComObjectMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem("ComObject を使ってExcelに接続する")
 $useComObjectMenuItem.CheckOnClick = $true
 [void]$optionsMenu.DropDownItems.Add($useComObjectMenuItem)
+# ImportExcel フォルダのパスを設定するメニューアイテムの作成
+$setImportExcelPathMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem("ImportExcel フォルダのパスを設定（ImportExcelをインストールせずに使う場合）")
+$setImportExcelPathMenuItem.Add_Click({
+    $folderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    if ($folderBrowserDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $importExcelPath = $folderBrowserDialog.SelectedPath
+        Save-Config -importExcelPath $importExcelPath
+        [System.Windows.Forms.MessageBox]::Show("設定が保存されました。")
+        Import-Module "$importExcelPath\ImportExcel.psd1"
+        Add-Type -Path "$importExcelPath\EPPlus.dll"
+    }
+})
+[void]$optionsMenu.DropDownItems.Add($setImportExcelPathMenuItem)
 
 # ヘルプメニューの作成
 $helpMenu = New-Object System.Windows.Forms.ToolStripMenuItem("ヘルプ")
