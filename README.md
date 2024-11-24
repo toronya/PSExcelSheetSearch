@@ -8,5 +8,5 @@
 ## 既知の不具合
 	- Version 0.1  ( 2024-11-25 リリース)
 		-  ImportExcel の読み込める件数に限界があり、大量データの場合に読む込でフリーズします。
-		-  Microsoft 365 で Excel ComObjecr にアクセスできない場合ケースがありましたので、初期値は ImportExcelにしています。
-		-  ExcelをComで使う場合にはオプションメニューから選択できるようにしています。（未検証）
+		-  Microsoft 365 で Excel ComObjecr にアクセスできない場合ケースがありましたので、ImportExcel の利用を前提にしています。
+		-  ExcelをComObjectで使うかどうかはオプションメニューから選択できるようにしています。（未検証）
