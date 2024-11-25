@@ -1,7 +1,10 @@
 Set-Location $PSScriptRoot
 
-$appVversion = "0.1"
-$appReleaseDate = "2024-11-25"
+$appVversion = "0.2"
+$appReleaseDate = "2024-11-26"
+
+# debug message 表示するか
+$debugOut = $false
 
 # 必要なモジュールをインポート
 Add-Type -AssemblyName System.Windows.Forms
@@ -38,9 +41,6 @@ if ($importExcelPath) {
     Add-Type -Path "$importExcelPath\EPPlus.dll"
 }
 
-# debug message 表示するか
-$debugOut = $false
-
 # Visual Stylesを有効にする
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -66,25 +66,9 @@ $exitMenuItem.Add_Click({ $form.Close() })
 # オプションメニューの作成
 $optionsMenu = New-Object System.Windows.Forms.ToolStripMenuItem("オプション")
 $useComObjectMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem("ComObject を使ってExcelに接続する")
-$useComObjectMenuItem.CheckOnClick = $true
 [void]$optionsMenu.DropDownItems.Add($useComObjectMenuItem)
 # ImportExcel フォルダのパスを設定するメニューアイテムの作成
 $setImportExcelPathMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem("ImportExcel フォルダのパスを設定（ImportExcelをインストールせずに使う場合）")
-$setImportExcelPathMenuItem.Add_Click({
-    $folderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    if ($folderBrowserDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $importExcelPath = $folderBrowserDialog.SelectedPath
-        Save-Config -importExcelPath $importExcelPath
-        [System.Windows.Forms.MessageBox]::Show("設定が保存されました。")
-        Import-Module "$importExcelPath\ImportExcel.psd1"
-        Add-Type -Path "$importExcelPath\EPPlus.dll"
-        $setImportExcelPathMenuItem.Checked = $true
-    }
-})
-if ($importExcelPath -ne ""){
-    # 設定ファイルからパスが読込できている場合、チェックオン
-    $setImportExcelPathMenuItem.Checked = $true
-}
 [void]$optionsMenu.DropDownItems.Add($setImportExcelPathMenuItem)
 
 # ヘルプメニューの作成
@@ -104,12 +88,57 @@ $versionMenuItem.Add_Click({ [System.Windows.Forms.MessageBox]::Show("バージョン
 
 # メニューバーにメニューを追加
 [void]$menuStrip.Items.Add($fileMenu)
-[void]$menuStrip.Items.Add($optionsMenu)
+#[void]$menuStrip.Items.Add($optionsMenu)
 [void]$menuStrip.Items.Add($helpMenu)
 
 # フォームにメニューバーを追加
 $form.MainMenuStrip = $menuStrip
 $form.Controls.Add($menuStrip)
+
+#--
+
+# オプションメニューのイベント
+$setImportExcelPathMenuItem.Add_Click({
+    $folderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    if ($folderBrowserDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $importExcelPath = $folderBrowserDialog.SelectedPath
+        Save-Config -importExcelPath $importExcelPath
+        [System.Windows.Forms.MessageBox]::Show("設定が保存されました。")
+        Import-Module "$importExcelPath\ImportExcel.psd1"
+        Add-Type -Path "$importExcelPath\EPPlus.dll"
+        $setImportExcelPathMenuItem.Checked = $true
+        $useComObjectMenuItem.Checked = $false
+    }
+})
+
+$useComObjectMenuItem.Add_Click({
+    if ($useComObjectMenuItem.Checked -eq $true) {
+        # ComObject 使わない
+        $useComObjectMenuItem.Checked = $false
+    }
+    else{
+        # ComObject 使うにする
+        $useComObjectMenuItem.Checked = $true
+        $setImportExcelPathMenuItem.Checked = $false
+    }
+})
+
+function Check-Confg {
+    # ComObject か Importxcel か
+    # 設定ファイルからパスが読込できているか
+    if ($importExcelPath -ne ""){
+        # use Importxcel
+        $setImportExcelPathMenuItem.Checked = $true
+        $useComObjectMenuItem.Checked = $false
+    }
+    else{
+        # use ComObject
+        $useComObjectMenuItem.Checked = $true
+        $setImportExcelPathMenuItem.Checked = $false
+    }
+}
+
+Check-Confg
 
 #--
 
@@ -122,9 +151,9 @@ $tableLayoutPanel.Top = $menuStrip.Height  # メニューバーの高さ分だけ下に配置
 $tableLayoutPanel.Height = $form.ClientSize.Height - $menuStrip.Height  # 残りの高さを設定
 $tableLayoutPanel.Width = $form.ClientSize.Width  # フォームの幅に合わせる
 $tableLayoutPanel.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor 
-[System.Windows.Forms.AnchorStyles]::Left -bor 
-[System.Windows.Forms.AnchorStyles]::Right -bor 
-[System.Windows.Forms.AnchorStyles]::Bottom
+    [System.Windows.Forms.AnchorStyles]::Left -bor 
+    [System.Windows.Forms.AnchorStyles]::Right -bor 
+    [System.Windows.Forms.AnchorStyles]::Bottom
 
 # テーブルレイアウトパネルをフォームに追加
 [void]$form.Controls.Add($tableLayoutPanel)
@@ -216,6 +245,14 @@ $tableLayoutPanel.Controls.Add($searchButton, 3, 2)
 
 # データグリッドビューの作成
 $dataGridView = New-Object System.Windows.Forms.DataGridView
+#
+#$dataGridView.VirtualMode = $true
+
+# ちらつき防止のため、DoubleBufferedプロパティを有効にする
+$dataGridView.GetType().GetProperty('DoubleBuffered', 
+    [System.Reflection.BindingFlags]::NonPublic -bor 
+    [System.Reflection.BindingFlags]::Instance).SetValue($dataGridView, $true, $null
+    )
 
 # 行番号を表示するイベントハンドラを追加 （標準では行番号は出ないため描写する）
 $dataGridView.add_RowPostPaint({
@@ -248,17 +285,40 @@ $fileButton.Add_Click({
             $excelPath = $openFileDialog.FileName
             $filePathTextBox.Text = $excelPath
             $sheetComboBox.Items.Clear()
-        
-            # エクセルファイルの読み込み
-            $excelPackage = [OfficeOpenXml.ExcelPackage]::new()
-            $fileStream = [System.IO.File]::OpenRead($excelPath)
-            $excelPackage.Load($fileStream)
-            $fileStream.Close()
 
-            # シート名をプルダウンメニューに追加
-            foreach ($worksheet in $excelPackage.Workbook.Worksheets) {
-                $sheetComboBox.Items.Add($worksheet.Name)
+            if ($useComObjectMenuItem.Checked) {
+                # ComObject版
+                # エクセルファイルの読み込み
+                $excel = New-Object -ComObject Excel.Application
+                # 読み取り専用モード
+                $workbook = $excel.Workbooks.Open($excelPath, [Type]::Missing, $true)
+
+                # シート名をプルダウンメニューに追加
+                foreach ($worksheet in $workbook.Worksheets ) {
+                    $sheetComboBox.Items.Add($worksheet.Name)
+                }
+                $workbook.Close($false)
+                $excel.Quit()
+
+                # プロセスが残るのでリリースする
+                [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook)
+                [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel)
             }
+            else{
+                #ImportExcel版
+                # エクセルファイルの読み込み
+                $excelPackage = [OfficeOpenXml.ExcelPackage]::new()
+                #$fileStream = [System.IO.File]::OpenRead($excelPath)
+                $fileStream = [System.IO.File]::Open($excelPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+                $excelPackage.Load($fileStream)
+                $fileStream.Close()
+
+                # シート名をプルダウンメニューに追加
+                foreach ($worksheet in $excelPackage.Workbook.Worksheets) {
+                    $sheetComboBox.Items.Add($worksheet.Name)
+                }
+            }
+        
             # １つ目のシート名を初期値で選択状態にする
             $sheetComboBox.SelectedIndex = 0
         }
@@ -285,7 +345,8 @@ $searchAction = {
             if ($useComObjectMenuItem.Checked) {
                 # COMオブジェクトを使用した検索
                 $excel = New-Object -ComObject Excel.Application
-                $workbook = $excel.Workbooks.Open($excelPath)
+                # 読み取り専用モード
+                $workbook = $excel.Workbooks.Open($excelPath, [Type]::Missing, $true)
                 $worksheet = $workbook.Sheets.Item($selectedSheet)
                 $range = $worksheet.UsedRange
                 $rowCount = $range.Rows.Count
@@ -310,12 +371,14 @@ $searchAction = {
                 }
                 $workbook.Close($false)
                 $excel.Quit()
-        
+                
+                # プロセスが残るのでリリースする
+                [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook)
+                [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel)
             }
             else {
-
                 # Import-Excelモジュールを使用した検索
-                Import-Excel -Path $excelPath -WorksheetName $selectedSheet | ForEach-Object {
+                Import-Excel -Path $excelPath -WorksheetName $selectedSheet  | ForEach-Object {
                     $data = $_
 
                     if ($i -eq 1) {
@@ -351,6 +414,9 @@ $searchAction = {
         $errorDetails = $_.Exception.Message
         $stckTrc = $_.Exception.StackTrace
         [System.Windows.Forms.MessageBox]::Show("$errorMessage`n`n詳細: $errorDetails`n`nスタックトレース: $stckTrc")
+        if ($null -ne $excel){
+            $excel.Quit()
+        }
     }
 }
 
